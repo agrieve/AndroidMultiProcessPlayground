@@ -27,10 +27,10 @@ import java.io.InputStreamReader;
  * Created by agrieve on 5/25/16.
  */
 public class JsApi {
-    static Handler uiHandler = new Handler(Looper.getMainLooper());
-    static JsApi instance;
+    public static Handler uiHandler = new Handler(Looper.getMainLooper());
+    public static JsApi instance;
 
-    Activity activeActivity;
+    public Activity activeActivity;
     private Scriptable jsGlobalScope;
 
     void evalJs(final String code) {

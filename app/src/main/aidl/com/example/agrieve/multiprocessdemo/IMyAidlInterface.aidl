@@ -12,4 +12,7 @@ interface IMyAidlInterface {
      * and return values in AIDL.
      */
     void postMessage(String aString);
+
+    void consumeJavaMemory(int numBytes);
+    void consumeNativeMemory(int numBytes);
 }

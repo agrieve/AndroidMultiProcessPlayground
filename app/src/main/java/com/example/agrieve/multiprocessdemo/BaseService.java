@@ -7,9 +7,13 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.util.Log;
 
+import java.util.ArrayList;
+import java.util.Random;
+
 public class BaseService extends Service {
     private final String TAG;
     private IMyAidlInterfaceCallback mCallback;
+    private ArrayList<byte[]> mWastedMemory = new ArrayList<>();
 
     public BaseService() {
         super();
@@ -28,6 +32,17 @@ public class BaseService extends Service {
         @Override
         public void postMessage(String aString) throws RemoteException {
             Log.i(TAG, "Post Message Recieved: " + aString);
+        }
+
+        @Override
+        public void consumeJavaMemory(int numBytes) {
+            mWastedMemory.add(new byte[numBytes]);
+            new Random().nextBytes(mWastedMemory.get(mWastedMemory.size() - 1));
+        }
+
+        @Override
+        public void consumeNativeMemory(int numBytes) {
+            JniMethods.consumeNativeMemory(numBytes);
         }
     };
 

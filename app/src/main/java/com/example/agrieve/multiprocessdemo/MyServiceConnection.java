@@ -7,14 +7,14 @@ import android.os.IBinder;
 import android.util.Log;
 
 public class MyServiceConnection implements ServiceConnection {
-    final Context mContext;
-    IMyAidlInterface mIRemoteService;
+    public final Context mContext;
+    public IMyAidlInterface mIRemoteService;
 
     /**
      * This implementation is used to receive callbacks from the remote
      * service.
      */
-    IMyAidlInterfaceCallback mCallback = new IMyAidlInterfaceCallback.Stub() {
+    public final IMyAidlInterfaceCallback mCallback = new IMyAidlInterfaceCallback.Stub() {
         // Background thread
         public void callback(String message) {
             Log.i("IMyAidlInterfaceCb", "Callback Message Recieved: " + message);
