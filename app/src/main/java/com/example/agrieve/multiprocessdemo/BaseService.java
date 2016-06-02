@@ -30,11 +30,6 @@ public class BaseService extends Service {
         }
 
         @Override
-        public void postMessage(String aString) throws RemoteException {
-            Log.i(TAG, "Post Message Recieved: " + aString);
-        }
-
-        @Override
         public void consumeJavaMemory(int numBytes) {
             mWastedMemory.add(new byte[numBytes]);
             new Random().nextBytes(mWastedMemory.get(mWastedMemory.size() - 1));
@@ -43,6 +38,26 @@ public class BaseService extends Service {
         @Override
         public void consumeNativeMemory(int numBytes) {
             JniMethods.consumeNativeMemory(numBytes);
+        }
+
+        @Override
+        public String createWorkerThread(int priority) {
+            return WorkerThread.create(priority, BaseService.this.getClass().getSimpleName());
+        }
+
+        @Override
+        public String createWorkerThreadNative(int priority) {
+            return WorkerThread.createNative(priority, BaseService.this.getClass().getSimpleName());
+        }
+
+        @Override
+        public void killWorkerThread(String threadId) {
+            WorkerThread.kill(threadId);
+        }
+
+        @Override
+        public String describeSpeed(String threadId) {
+            return WorkerThread.describeSpeed(threadId);
         }
     };
 

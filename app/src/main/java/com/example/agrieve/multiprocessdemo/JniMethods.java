@@ -12,4 +12,5 @@ public class JniMethods {
         Log.w("JniMethods", "Done loading native code.");
     }
     public static native void consumeNativeMemory(int amountInBytes);
+    public static native String createPosixThread(int priority, String threadName, Runnable func);
 }

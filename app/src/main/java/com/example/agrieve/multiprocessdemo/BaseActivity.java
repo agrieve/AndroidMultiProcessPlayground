@@ -52,4 +52,20 @@ public class BaseActivity extends Activity {
     public void consumeNativeMemory(int numBytes) {
         JniMethods.consumeNativeMemory(numBytes);
     }
+
+    public String createWorkerThread(int priority) {
+        return WorkerThread.create(priority, getClass().getSimpleName());
+    }
+
+    public String createWorkerThreadNative(int priority) {
+        return WorkerThread.createNative(priority, getClass().getSimpleName());
+    }
+
+    public void killWorkerThread(String threadId) {
+        WorkerThread.kill(threadId);
+    }
+
+    public String describeSpeed(String threadId) {
+        return WorkerThread.describeSpeed(threadId);
+    }
 }

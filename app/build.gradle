@@ -18,6 +18,7 @@ model {
             toolchain "clang"
             stl "stlport_static"
             cppFlags.add("-std=c++11")
+            ldLibs.add("log")
         }
     }
 }

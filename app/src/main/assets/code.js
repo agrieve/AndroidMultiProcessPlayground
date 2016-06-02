@@ -1,7 +1,12 @@
 var appPackage = com.example.agrieve.multiprocessdemo;
 var Context = android.content.Context;
 var Intent = android.content.Intent;
+var Process = android.os.Process;
+var Thread = java.lang.Thread;
+var Runtime = java.lang.Runtime;
+
 var bindRecords = [];
+var workerThreads = [];
 var lastRenderer = 0;
 var lastTrimCallbackLevel;
 
@@ -67,6 +72,37 @@ Renderer.prototype.consumeNativeMemory = function(megs) {
   api.consumeNativeMemory(megs, this.waivedBinding.bindRecord.connection.mIRemoteService);
 };
 
+Renderer.prototype.createWorker = function(opt_threadPriority) {
+  return api.createWorker(opt_threadPriority, this.waivedBinding.bindRecord.connection.mIRemoteService, this.serviceName);
+};
+
+
+function WorkerThread(target, threadId, threadPriority, isNative) {
+  this.target = target;
+  this.threadId = threadId;
+  this.threadPriority = threadPriority;
+  this.isNative = isNative;
+};
+
+WorkerThread.prototype.kill = function() {
+  var idx = workerThreads.indexOf(this);
+  if (idx == -1) {
+    return 'Thread already killed.';
+  }
+  workerThreads.splice(idx, 1);
+  this.target.killWorkerThread(this.threadId);
+};
+
+WorkerThread.prototype.describeSpeed = function() {
+  return this.target.describeSpeed(this.threadId);
+};
+
+WorkerThread.prototype.toString = function() {
+  var type = this.isNative ? 'pthread' : 'java';
+  return this.threadId + '(type=' + type + ' pri=' + this.threadPriority + '): ' + this.describeSpeed();
+};
+
+
 
 var api = {};
 
@@ -100,12 +136,34 @@ api.help = function() {
       }
     }
   }
+  function descConstants(clazz, prefix, showValues) {
+    var names = [];
+    for (var k in clazz) {
+      if (k.indexOf(prefix) == 0) {
+        if (showValues) {
+          names.push(k + '=' + clazz[k]);
+        } else {
+          names.push(k);
+        }
+      }
+    }
+    console.log(names.join(', '));
+  }
   console.log('Main API:');
   desc('api', api);
+  console.log('');
   console.log("class Renderer api:");
   desc('renderer', new Renderer());
+  console.log('');
   console.log("class Binding:");
   desc('binding', new Binding({}, []));
+  console.log('');
+  console.log("Binding Constants:");
+  descConstants(Context, 'BIND_');
+  console.log('');
+  console.log("Thread Priority Constants (Process.*)");
+  descConstants(Process, 'THREAD_PRIORITY', true);
+  console.log('');
   console.log('Useful shell commands:')
   console.log("  adb shell dumpsys activity | sed -n -e '/dumpsys activity processes/,$p'")
   console.log("  adb shell dumpsys meminfo")
@@ -155,12 +213,6 @@ api.unbindService = function(indexOrRecord) {
   bindRecords.splice(bindRecordIndex, 1);
 };
 
-api.listBindings = function() {
-  for (var i = 0; i < bindRecords.length; ++i) {
-    console.log('' + i + ': ' + bindRecords[i]);
-  }
-};
-
 api.createRenderer = function(opt_serviceName, opt_callback) {
   if (!opt_serviceName) {
     opt_serviceName = 'Service' + (++lastRenderer);
@@ -189,6 +241,12 @@ api.createAll = function(opt_consumeJavaMegs) {
   });
 };
 
+api.listBindings = function() {
+  for (var i = 0; i < bindRecords.length; ++i) {
+    console.log('' + i + ': ' + bindRecords[i]);
+  }
+};
+
 api.printMemoryInfo = function() {
   function formatMb(bytes) {
     return (Math.round(bytes / 1024 / 102.4) / 10) + 'mb';
@@ -201,6 +259,23 @@ api.printMemoryInfo = function() {
   console.log('Device Low memory threshold: ' + formatMb(memInfo.threshold));
   console.log('Debug.getNativeHeapSize() = ' + formatMb(android.os.Debug.getNativeHeapSize()));
   console.log('Debug.getPss() = ' + formatMb(android.os.Debug.getPss()));
+};
+
+api.listLocalThreads = function() {
+  var numThreads = Thread.activeCount();
+  var threads = java.lang.reflect.Array.newInstance(Thread, numThreads);
+  Thread.enumerate(threads);
+  for (var i = 0; i < threads.length; ++i) {
+    console.log(i + ': ' + threads[i].getName() + '(priority=' + threads[i].getPriority() + ')');
+  }
+  console.log('Number of processors: ' + Runtime.getRuntime().availableProcessors());
+};
+
+api.listWorkers = function() {
+  for (var i = 0; i < workerThreads.length; ++i) {
+    console.log('' + i + ': ' + workerThreads[i]);
+  }
+  console.log('Number of processors: ' + Runtime.getRuntime().availableProcessors());
 };
 
 api.consumeJavaMemory = function(megs, opt_target) {
@@ -227,20 +302,43 @@ api.consumeNativeMemoryUntilLow = function() {
     if (lastTrimCallbackLevel) {
       console.log('Consumed ' + count + 'mb total.');
     } else {
-      count += 10;
-      api.consumeNativeMemory(10);
-      setTimeout(helper, 100);
+      count += 1;
+      api.consumeNativeMemory(1);
+      setTimeout(helper, 1);
     }
   }
   helper();
 };
+
+api.createWorker = function(opt_threadPriority, opt_target, opt_targetName) {
+  opt_threadPriority = opt_threadPriority || 0; // THREAD_PRIORITY_DEFAULT = 0.
+  opt_target = opt_target || api.jsApi.activeActivity;
+  opt_targetName = opt_targetName || 'ActivityApplication';
+  var threadId = opt_target.createWorkerThread(opt_threadPriority);
+  var ret = new WorkerThread(opt_target, threadId, opt_threadPriority);
+  workerThreads.push(ret);
+  return ret;
+};
+
+api.createWorkerNative = function(opt_threadPriority, opt_target, opt_targetName) {
+  opt_threadPriority = opt_threadPriority || 0; // THREAD_PRIORITY_DEFAULT = 0.
+  opt_target = opt_target || api.jsApi.activeActivity;
+  opt_targetName = opt_targetName || 'ActivityApplication';
+  var threadId = opt_target.createWorkerThreadNative(opt_threadPriority);
+  var ret = new WorkerThread(opt_target, threadId, opt_threadPriority, true);
+  workerThreads.push(ret);
+  return ret;
+};
+
 
 
 api.reset = function() {
   while (bindRecords.length) {
     api.unbindService(0);
   }
-  bindRecords = [];
+  while (workerThreads.length) {
+    workerThreads[0].kill();
+  }
   lastRenderer = 0;
 };
 

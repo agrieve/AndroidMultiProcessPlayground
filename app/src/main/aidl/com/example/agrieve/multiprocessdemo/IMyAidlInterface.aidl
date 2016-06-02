@@ -7,12 +7,11 @@ interface IMyAidlInterface {
 
     int setupConnection(com.example.agrieve.multiprocessdemo.IMyAidlInterfaceCallback callback);
 
-    /**
-     * Demonstrates some basic types that you can use as parameters
-     * and return values in AIDL.
-     */
-    void postMessage(String aString);
-
     void consumeJavaMemory(int numBytes);
     void consumeNativeMemory(int numBytes);
+
+    String createWorkerThread(int priority);
+    String createWorkerThreadNative(int priority);
+    void killWorkerThread(String threadId);
+    String describeSpeed(String threadId);
 }
