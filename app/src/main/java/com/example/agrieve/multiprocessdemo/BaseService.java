@@ -56,8 +56,18 @@ public class BaseService extends Service {
         }
 
         @Override
-        public String describeSpeed(String threadId) {
+        public float[] describeSpeed(String threadId) {
             return WorkerThread.describeSpeed(threadId);
+        }
+
+        @Override
+        public void setNice(int value) {
+            JniMethods.setNice(value);
+        }
+
+        @Override
+        public int getNice() {
+            return JniMethods.getNice();
         }
     };
 

@@ -13,4 +13,6 @@ public class JniMethods {
     }
     public static native void consumeNativeMemory(int amountInBytes);
     public static native String createPosixThread(int priority, String threadName, Runnable func);
+    public static native int getNice();
+    public static native void setNice(int priority);
 }

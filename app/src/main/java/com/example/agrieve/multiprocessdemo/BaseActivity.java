@@ -65,7 +65,15 @@ public class BaseActivity extends Activity {
         WorkerThread.kill(threadId);
     }
 
-    public String describeSpeed(String threadId) {
+    public float[] describeSpeed(String threadId) {
         return WorkerThread.describeSpeed(threadId);
+    }
+
+    public void setNice(int value) {
+        JniMethods.setNice(value);
+    }
+
+    public int getNice() {
+        return JniMethods.getNice();
     }
 }

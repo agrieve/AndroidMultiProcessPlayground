@@ -13,5 +13,8 @@ interface IMyAidlInterface {
     String createWorkerThread(int priority);
     String createWorkerThreadNative(int priority);
     void killWorkerThread(String threadId);
-    String describeSpeed(String threadId);
+    float[] describeSpeed(String threadId);
+
+    void setNice(int value);
+    int getNice();
 }
