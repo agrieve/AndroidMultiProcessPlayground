@@ -189,6 +189,7 @@ api.help = function() {
   console.log('');
   console.log('Useful shell commands:')
   console.log("  adb shell dumpsys meminfo")
+  console.log("  adb shell top -n 1 -t | grep multiprocessdemo")
   console.log("  adb shell top -m 20 -t")
   console.log("  adb shell dumpsys activity | sed -n -e '/dumpsys activity processes/,$p'")
 };
