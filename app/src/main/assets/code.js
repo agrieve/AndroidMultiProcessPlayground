@@ -9,7 +9,6 @@ var bindRecords = [];
 var workerThreads = [];
 var renderers = [];
 var lastRenderer = 0;
-var lastTrimCallbackLevel;
 
 function setTimeout(func, delay) {
   appPackage.JsApi.uiHandler.postDelayed(func, delay || 0);
@@ -80,7 +79,7 @@ Renderer.prototype.consumeNativeMemory = function(megs, opt_chunkSize) {
   api.consumeNativeMemory(megs, opt_chunkSize, this.waivedBinding.bindRecord.connection.mIRemoteService);
 };
 
-Renderer.prototype.consumeNativeMemoryUntilLow = function(megs, opt_chunkSize) {
+Renderer.prototype.consumeNativeMemoryUntilLow = function(opt_chunkSize) {
   api.consumeNativeMemoryUntilLow(opt_chunkSize, this);
 };
 
@@ -259,10 +258,10 @@ api.createAllRenderers = function(opt_consumeJavaMegs) {
       ren3 = api.createRenderer(['BIND_NOT_FOREGROUND'], null, function() {
         ren4 = api.createRenderer(['BIND_NOT_FOREGROUND'], null, function() {
           if (opt_consumeJavaMegs) {
-            ren1.consumeNativeMemory(opt_consumeJavaMegs);
-            ren2.consumeNativeMemory(opt_consumeJavaMegs);
-            ren3.consumeNativeMemory(opt_consumeJavaMegs);
-            ren4.consumeNativeMemory(opt_consumeJavaMegs);
+            ren1.consumeNativeMemory(opt_consumeJavaMegs, 20);
+            ren2.consumeNativeMemory(opt_consumeJavaMegs, 20);
+            ren3.consumeNativeMemory(opt_consumeJavaMegs, 20);
+            ren4.consumeNativeMemory(opt_consumeJavaMegs, 20);
           }
         });
       });
@@ -359,16 +358,16 @@ api.consumeNativeMemoryUntilLow = function(opt_chunkSize, opt_renderer) {
   opt_chunkSize = opt_chunkSize || 2;
   var target = opt_renderer || api;
   var count = 0;
-  lastTrimCallbackLevel = null;
+  callbackApi.lastTrimCallbackLevel = null;
   function helper() {
     if (count > 0 && count % 200 == 0) {
       console.log('Consumed ' + count + 'mb...');
     }
-    if (lastTrimCallbackLevel) {
+    if (callbackApi.lastTrimCallbackLevel) {
       console.log('Consumed ' + count + 'mb total.');
     } else {
       count += 1;
-      target.consumeNativeMemory(1);
+      target.consumeNativeMemory(opt_chunkSize);
       setTimeout(helper, 1);
     }
   }
@@ -429,6 +428,7 @@ api.clearWorkers = function() {
 var callbackApi = {};
 
 callbackApi.connectionCallback = null;
+callbackApi.lastTrimCallbackLevel = null;
 
 callbackApi.onServiceConnected = function(connection, componentName) {
   var activityName = connection.mContext.getClass().getSimpleName();
@@ -464,7 +464,7 @@ callbackApi.onTrimMemory = function(level) {
       break;
     }
   }
-  lastTrimCallbackLevel = level;
+  callbackApi.lastTrimCallbackLevel = level;
   console.log('onTrimMemory(' + level + ')');
 };
 
