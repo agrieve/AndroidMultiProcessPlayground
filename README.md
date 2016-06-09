@@ -1,8 +1,9 @@
 # AndroidMultiProcessPlayground
 
 An Android app that allows for easy experimention of:
+ * `BIND_*` flags for `bindService()`
  * OutOfMemory handling
- * Affects of thread priorities
+ * Thread priorities
 
 Build & Run:
 
