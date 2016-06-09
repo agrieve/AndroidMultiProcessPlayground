@@ -5,7 +5,7 @@ An Android app that allows for easy experimention of:
  * OutOfMemory handling
  * Thread priorities
 
-Build & Run:
+## Build & Run:
 
     ./gradlew assembleDebug
     adb install -r app/build/outputs/apk/app-debug.apk
