@@ -53,12 +53,8 @@ public class BaseActivity extends Activity {
         JniMethods.consumeNativeMemory(numBytes);
     }
 
-    public String createWorkerThread(int priority) {
-        return WorkerThread.create(priority, getClass().getSimpleName());
-    }
-
-    public String createWorkerThreadNative(int priority) {
-        return WorkerThread.createNative(priority, getClass().getSimpleName());
+    public String createWorkerThread(int priority, boolean posix) {
+        return WorkerThread.create(priority, getClass().getSimpleName(), posix);
     }
 
     public void killWorkerThread(String threadId) {
@@ -67,6 +63,14 @@ public class BaseActivity extends Activity {
 
     public float[] describeSpeed(String threadId) {
         return WorkerThread.describeSpeed(threadId);
+    }
+
+    public void setWorkerNice(String threadId, int value) {
+        WorkerThread.setWorkerNice(threadId, value);
+    }
+
+    public void resetWorkerStats(String threadId) {
+        WorkerThread.resetStats(threadId);
     }
 
     public void setNice(int value) {

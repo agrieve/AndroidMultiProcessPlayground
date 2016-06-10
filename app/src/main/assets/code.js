@@ -83,8 +83,8 @@ Renderer.prototype.consumeNativeMemoryUntilLow = function(opt_chunkSize) {
   api.consumeNativeMemoryUntilLow(opt_chunkSize, this);
 };
 
-Renderer.prototype.createWorker = function(opt_threadPriority) {
-  return api.createWorker(opt_threadPriority, this.waivedBinding.bindRecord.connection.mIRemoteService, this.serviceName);
+Renderer.prototype.createWorker = function(opt_threadPriority, opt_posix) {
+  return api.createWorker(opt_threadPriority, opt_posix, this.waivedBinding.bindRecord.connection.mIRemoteService, this.serviceName);
 };
 
 Renderer.prototype.createWorkerNative = function(opt_threadPriority) {
@@ -124,7 +124,19 @@ WorkerThread.prototype.toString = function() {
   return this.threadId + '(pri=' + this.threadPriority + ')';
 };
 
+WorkerThread.prototype.getJavaThread = function() {
+  // Works only for local threads (not on Renderers).
+  return appPackage.WorkerThread.getJavaThread(this.threadId);
+};
 
+WorkerThread.prototype.setNice = function(value) {
+  this.threadPriority = value;
+  this.target.setWorkerNice(this.threadId, value);
+};
+
+WorkerThread.prototype.resetStats = function() {
+  this.target.resetWorkerStats(this.threadId);
+};
 
 var api = {};
 
@@ -181,6 +193,9 @@ api.help = function() {
   console.log("class Binding:");
   desc('binding', new Binding({}, []));
   console.log('');
+  console.log("class WorkerThread:");
+  desc('worker', new WorkerThread({}, []));
+  console.log('');
   console.log("Binding Constants:");
   descConstants(Context, 'BIND_');
   console.log('');
@@ -191,6 +206,7 @@ api.help = function() {
   console.log("  adb shell dumpsys meminfo")
   console.log("  adb shell top -n 1 -t | grep multiprocessdemo")
   console.log("  adb shell top -m 20 -t")
+  console.log("  adb shell top -t | grep ")
   console.log("  adb shell dumpsys activity | sed -n -e '/dumpsys activity processes/,$p'")
 };
 
@@ -292,7 +308,7 @@ api.printMemoryInfo = function() {
 
 api.listThreads = function() {
   var numThreads = Thread.activeCount();
-  var threads = java.lang.reflect.Array.newInstance(Thread, numThreads);
+  threads = java.lang.reflect.Array.newInstance(Thread, numThreads);
   Thread.enumerate(threads);
   console.log('Threads in the main process:');
   for (var i = 0; i < threads.length; ++i) {
@@ -356,7 +372,7 @@ api.consumeNativeMemory = function(megs, opt_chunkSize, opt_target) {
 };
 
 api.consumeNativeMemoryUntilLow = function(opt_chunkSize, opt_renderer) {
-  opt_chunkSize = opt_chunkSize || 2;
+  opt_chunkSize = opt_chunkSize || 10;
   var target = opt_renderer || api;
   var count = 0;
   callbackApi.lastTrimCallbackLevel = null;
@@ -375,25 +391,27 @@ api.consumeNativeMemoryUntilLow = function(opt_chunkSize, opt_renderer) {
   helper();
 };
 
-api.createWorker = function(opt_threadPriority, opt_target, opt_targetName) {
+api.createWorker = function(opt_threadPriority, opt_posix, opt_target, opt_targetName) {
   opt_threadPriority = opt_threadPriority || 0; // THREAD_PRIORITY_DEFAULT = 0.
   opt_target = opt_target || api.jsApi.activeActivity;
   opt_targetName = opt_targetName || 'ActivityApplication';
-  var threadId = opt_target.createWorkerThread(opt_threadPriority);
+  var threadId = opt_target.createWorkerThread(opt_threadPriority, false);
   var ret = new WorkerThread(opt_target, threadId, opt_threadPriority);
   workerThreads.push(ret);
   return ret;
 };
 
 api.createWorkerNative = function(opt_threadPriority, opt_target, opt_targetName) {
-  opt_threadPriority = opt_threadPriority || 0; // THREAD_PRIORITY_DEFAULT = 0.
-  opt_target = opt_target || api.jsApi.activeActivity;
-  opt_targetName = opt_targetName || 'ActivityApplication';
-  var threadId = opt_target.createWorkerThreadNative(opt_threadPriority);
-  var ret = new WorkerThread(opt_target, threadId, opt_threadPriority);
-  workerThreads.push(ret);
-  return ret;
+  return api.createWorker(opt_threadPriority, true, opt_target, opt_targetName);
 };
+
+api.resetWorkerStats = function() {
+  workerThreads.forEach(function(worker) {
+    worker.resetStats();
+  });
+};
+
+
 
 
 api.createAllWorkers = function() {
@@ -402,11 +420,8 @@ api.createAllWorkers = function() {
   targets.forEach(function(target) {
     for (var i = 0; i < 8; ++i) {
       var priority = 10 - i;
-      if (i % 2) {
-        target.createWorker(priority);
-      } else {
-        target.createWorkerNative(priority);
-      }
+      var posix = i % 2 != 0;
+      target.createWorker(priority, posix);
     }
   });
   console.log('Created 8 workers per process.');

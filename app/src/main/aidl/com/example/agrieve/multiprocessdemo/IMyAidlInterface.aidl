@@ -10,10 +10,11 @@ interface IMyAidlInterface {
     void consumeJavaMemory(int numBytes);
     void consumeNativeMemory(int numBytes);
 
-    String createWorkerThread(int priority);
-    String createWorkerThreadNative(int priority);
+    String createWorkerThread(int priority, boolean posix);
     void killWorkerThread(String threadId);
     float[] describeSpeed(String threadId);
+    void setWorkerNice(String threadId, int value);
+    void resetWorkerStats(String threadId);
 
     void setNice(int value);
     int getNice();

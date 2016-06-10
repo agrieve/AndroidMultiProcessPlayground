@@ -41,13 +41,8 @@ public class BaseService extends Service {
         }
 
         @Override
-        public String createWorkerThread(int priority) {
-            return WorkerThread.create(priority, BaseService.this.getClass().getSimpleName());
-        }
-
-        @Override
-        public String createWorkerThreadNative(int priority) {
-            return WorkerThread.createNative(priority, BaseService.this.getClass().getSimpleName());
+        public String createWorkerThread(int priority, boolean posix) {
+            return WorkerThread.create(priority, BaseService.this.getClass().getSimpleName(), posix);
         }
 
         @Override
@@ -58,6 +53,16 @@ public class BaseService extends Service {
         @Override
         public float[] describeSpeed(String threadId) {
             return WorkerThread.describeSpeed(threadId);
+        }
+
+        @Override
+        public void setWorkerNice(String threadId, int value) {
+            WorkerThread.setWorkerNice(threadId, value);
+        }
+
+        @Override
+        public void resetWorkerStats(String threadId) {
+            WorkerThread.resetStats(threadId);
         }
 
         @Override
