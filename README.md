@@ -116,3 +116,19 @@ In a terminal:
 
     # Monitor CPU usage of top threads
     adb shell top -m 20 -t
+
+### Example Workflow #6 - Changing Thread Priorities
+
+In devtools:
+
+    api.createWorker(0)
+    api.createWorker(0)
+    api.createWorker(10)
+    // Show performance of each thread
+    api.listWorkers()
+    
+    workerThreads[2].setNice(0)
+    api.resetWorkerStats()
+    // Show that changed priority worked.
+    api.listWorkers()
+    
