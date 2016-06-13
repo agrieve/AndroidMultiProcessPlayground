@@ -14,6 +14,16 @@ function setTimeout(func, delay) {
   appPackage.JsApi.uiHandler.postDelayed(func, delay || 0);
 }
 
+function readFile(f) {
+  var is = new java.io.FileInputStream(f);
+  try {
+    var s = new java.util.Scanner(is).useDelimiter("\\A");
+    return s.hasNext() ? s.next() : "";
+  } finally {
+    is.close();
+  }
+}
+
 function BindRecord(connection, serviceName, bindFlagsAsStrList) {
   this.connection = connection;
   this.contextName = connection.mContext.getClass().getSimpleName();
@@ -35,7 +45,8 @@ function Binding(renderer, bindFlagsAsStrList) {
 
 Binding.prototype.bind = function(callback) {
   if (this.isBound) {
-    return 'Already Bound.';
+    console.log('Already Bound.');
+    throw Error();
   }
   this.bindRecord = api.bindService(this.renderer.serviceName, this.bindFlagsAsStrList, this.renderer.context, callback);
   this.isBound = true;
@@ -43,7 +54,8 @@ Binding.prototype.bind = function(callback) {
 
 Binding.prototype.unbind = function() {
   if (!this.isBound) {
-    return 'Already Unbound.';
+    console.log('Already Unbound.');
+    throw Error();
   }
   api.unbindService(this.bindRecord);
   this.bindRecord = null;
@@ -53,6 +65,7 @@ Binding.prototype.unbind = function() {
 function Renderer(context, serviceName, opt_extraBindFlagsAsStrList) {
   this.context = context;
   this.serviceName = serviceName;
+  this.pid = 0;
   this.strongBinding = new Binding(this, ['BIND_AUTO_CREATE', 'BIND_IMPORTANT']);
   this.moderateBinding = new Binding(this, ['BIND_AUTO_CREATE']);
   this.perceptBinding = new Binding(this, ['BIND_AUTO_CREATE', 'BIND_NOT_VISIBLE']);
@@ -65,40 +78,52 @@ function Renderer(context, serviceName, opt_extraBindFlagsAsStrList) {
   }
 }
 
-Renderer.prototype.consumeJavaMemory = function(megs, opt_chunkSize) {
+Renderer.prototype._checkWaivedBinding = function(megs, opt_chunkSize) {
   if (!this.waivedBinding.isBound) {
-    return 'Requires waivedBinding to be bound.';
+    console.log('Requires waivedBinding to be bound.');
+    throw Error();
   }
+};
+
+Renderer.prototype.consumeJavaMemory = function(megs, opt_chunkSize) {
+  this._checkWaivedBinding();
   api.consumeJavaMemory(megs, opt_chunkSize, this.waivedBinding.bindRecord.connection.mIRemoteService);
 };
 
 Renderer.prototype.consumeNativeMemory = function(megs, opt_chunkSize) {
-  if (!this.waivedBinding.isBound) {
-    return 'Requires waivedBinding to be bound.';
-  }
+  this._checkWaivedBinding();
   api.consumeNativeMemory(megs, opt_chunkSize, this.waivedBinding.bindRecord.connection.mIRemoteService);
 };
 
 Renderer.prototype.consumeNativeMemoryUntilLow = function(opt_chunkSize) {
+  this._checkWaivedBinding();
   api.consumeNativeMemoryUntilLow(opt_chunkSize, this);
 };
 
 Renderer.prototype.createWorker = function(opt_threadPriority, opt_posix) {
+  this._checkWaivedBinding();
   return api.createWorker(opt_threadPriority, opt_posix, this.waivedBinding.bindRecord.connection.mIRemoteService, this.serviceName);
 };
 
 Renderer.prototype.createWorkerNative = function(opt_threadPriority) {
+  this._checkWaivedBinding();
   return api.createWorkerNative(opt_threadPriority, this.waivedBinding.bindRecord.connection.mIRemoteService, this.serviceName);
 };
 
 Renderer.prototype.setNice = function(value) {
+  this._checkWaivedBinding();
   this.waivedBinding.bindRecord.connection.mIRemoteService.setNice(value);
 };
 
 Renderer.prototype.getNice = function() {
+  this._checkWaivedBinding();
   return this.waivedBinding.bindRecord.connection.mIRemoteService.getNice();
 };
 
+Renderer.prototype.killProcess = function() {
+  this._checkWaivedBinding();
+  return this.waivedBinding.bindRecord.connection.mIRemoteService.killProcess();
+};
 
 
 function WorkerThread(target, threadId, threadPriority) {
@@ -110,7 +135,8 @@ function WorkerThread(target, threadId, threadPriority) {
 WorkerThread.prototype.kill = function() {
   var idx = workerThreads.indexOf(this);
   if (idx == -1) {
-    return 'Thread already killed.';
+    console.log('Thread already killed.');
+    throw Error();
   }
   workerThreads.splice(idx, 1);
   this.target.killWorkerThread(this.threadId);
@@ -202,17 +228,19 @@ api.help = function() {
   console.log("Thread Priority Constants (Process.*)");
   descConstants(Process, 'THREAD_PRIORITY', true);
   console.log('');
+
   console.log('Useful shell commands:')
   console.log("  adb shell dumpsys meminfo")
-  console.log("  adb shell top -n 1 -t | grep multiprocessdemo")
-  console.log("  adb shell top -m 20 -t")
-  console.log("  adb shell top -t | grep ")
   console.log("  adb shell dumpsys activity | sed -n -e '/dumpsys activity processes/,$p'")
+  console.log("  adb shell top -m 20 -t")
+  console.log("  adb shell top -n 1 -t | grep multiprocessdemo")
+  console.log("  adb shell ps -p -t | grep _a" + (Process.myUid() % 10000));
 };
 
 api.bindService = function(serviceName, bindFlagsAsStrList, opt_context, opt_callback) {
   if (callbackApi.connectionCallback) {
-    throw Error('already a connection callback');
+    console.log('already a connection callback')
+    throw Error();
   }
   callbackApi.connectionCallback = function() {
     bindRecord.pid = connection.mIRemoteService.setupConnection(connection.mCallback);
@@ -232,7 +260,8 @@ api.bindService = function(serviceName, bindFlagsAsStrList, opt_context, opt_cal
   });
   var connection = new appPackage.MyServiceConnection(activeActivity);
   if (!activeActivity.bindService(intent, connection, bindFlags)) {
-    throw Error('Bind failed.');
+    console.log('Bind failed.');
+    throw Error();
   }
   var bindRecord = new BindRecord(connection, serviceName, bindFlagsAsStrList);
   bindRecords.push(bindRecord);
@@ -249,7 +278,8 @@ api.unbindService = function(indexOrRecord) {
   }
   var bindRecordIndex = bindRecords.indexOf(bindRecord);
   if (bindRecordIndex == -1) {
-    return 'Invalid index.';
+    console.log('Invalid index.');
+    throw Error();
   }
   console.log('Removing binding ' + bindRecordIndex + ': ' + bindRecord);
   bindRecord.connection.mContext.unbindService(bindRecord.connection);
@@ -262,6 +292,7 @@ api.createRenderer = function(opt_extraBindFlagsAsStrList, opt_serviceName, opt_
   }
   var renderer = new Renderer(api.jsApi.activeActivity, opt_serviceName, opt_extraBindFlagsAsStrList);
   renderer.moderateBinding.bind(function() {
+    renderer.pid = renderer.moderateBinding.bindRecord.pid;
     renderer.waivedBinding.bind(opt_callback);
   });
   renderers.push(renderer);
@@ -292,6 +323,23 @@ api.listBindings = function() {
   }
 };
 
+api.listOomScores = function() {
+  function printScore(name, pid) {
+    try {
+      var adjust = readFile('/proc/' + pid + '/oom_adj').trim();
+      var score = readFile('/proc/' + pid + '/oom_score').trim();
+      var scoreAdj = readFile('/proc/' + pid + '/oom_score_adj').trim();
+      console.log(name + ': pid=' + pid + ' adj=' + adjust + ' score=' + score + ' score_adj=' + scoreAdj);
+    } catch(e) {
+      console.log(name + ': pid=' + pid + ' ERROR. Likely process has died.');
+    }
+  }
+  printScore('MainApp', Process.myPid());
+  renderers.forEach(function(ren) {
+    printScore(ren.serviceName, ren.pid);
+  });
+};
+
 api.printMemoryInfo = function() {
   function formatMb(bytes) {
     return (Math.round(bytes / 1024 / 102.4) / 10) + 'mb';
@@ -304,6 +352,15 @@ api.printMemoryInfo = function() {
   console.log('Device Low memory threshold: ' + formatMb(memInfo.threshold));
   console.log('Debug.getNativeHeapSize() = ' + formatMb(android.os.Debug.getNativeHeapSize()));
   console.log('Debug.getPss() = ' + formatMb(android.os.Debug.getPss()));
+
+  var myInfo = new android.app.ActivityManager.RunningAppProcessInfo();
+  activityManager.getMyMemoryState(myInfo);
+  console.log('');
+  console.log('myInfo.lastTrimLevel=' + myInfo.lastTrimLevel);
+  console.log('myInfo.importance=' + myInfo.importance);
+  console.log('myInfo.lru=' + myInfo.lru);
+  console.log('myInfo.importanceReasonCode=' + myInfo.importanceReasonCode);
+  return activityManager.getRunningAppProcesses();
 };
 
 api.listThreads = function() {
@@ -411,9 +468,6 @@ api.resetWorkerStats = function() {
   });
 };
 
-
-
-
 api.createAllWorkers = function() {
   var targets = [api];
   targets.push.apply(targets, renderers);
@@ -473,7 +527,7 @@ callbackApi.onActivityDestroyed = function(activity) {
   }
 };
 
-callbackApi.onTrimMemory = function(level) {
+callbackApi.onTrimMemory = function(contextName, level) {
   for (var k in android.content.ComponentCallbacks2) {
     if (android.content.ComponentCallbacks2[k] === level) {
       level = k;
@@ -481,7 +535,7 @@ callbackApi.onTrimMemory = function(level) {
     }
   }
   callbackApi.lastTrimCallbackLevel = level;
-  console.log('onTrimMemory(' + level + ')');
+  console.log(contextName + '.onTrimMemory(' + level + ')');
 };
 
 api.help();

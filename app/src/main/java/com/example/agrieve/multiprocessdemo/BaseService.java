@@ -74,13 +74,29 @@ public class BaseService extends Service {
         public int getNice() {
             return JniMethods.getNice();
         }
+
+        @Override
+        public void killProcess() {
+            System.exit(1);
+        }
     };
 
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        try {
+            Log.i(TAG, "onTrimMemory(" + level + ")");
+            mCallback.onTrimMemory(level);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
 
     @Override
     public void onCreate() {
         Log.i(TAG, "Creating new ChildProcessService pid=" + Process.myPid());
         super.onCreate();
+        registerComponentCallbacks(this);
     }
 
     @Override

@@ -41,7 +41,8 @@ public class BaseActivity extends Activity {
     @Override
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
-        JsApi.instance.callback("onTrimMemory", level);
+        Log.i(TAG, "onTrimMemory(" + level + ")");
+        JsApi.instance.callback("onTrimMemory", "MainActivity", level);
     }
 
     public void consumeJavaMemory(int numBytes) {
@@ -79,5 +80,9 @@ public class BaseActivity extends Activity {
 
     public int getNice() {
         return JniMethods.getNice();
+    }
+
+    public void killProcess() {
+        System.exit(1);
     }
 }

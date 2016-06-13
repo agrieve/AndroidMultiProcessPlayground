@@ -5,6 +5,7 @@ import android.app.Application;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import com.facebook.stetho.InspectorModulesProvider;
 import com.facebook.stetho.Stetho;
@@ -27,6 +28,7 @@ import java.io.InputStreamReader;
  * Created by agrieve on 5/25/16.
  */
 public class JsApi {
+    private static final String TAG = "JsApi";
     public static Handler uiHandler = new Handler(Looper.getMainLooper());
     public static JsApi instance;
 
@@ -48,6 +50,10 @@ public class JsApi {
     }
 
     void callback(final String callbackName, final Object... args) {
+        if (jsGlobalScope == null) {
+            Log.w(TAG, "jsGlobalScope was null for callback " + callbackName + " args: " + args);
+            return;
+        }
         uiHandler.post(new Runnable() {
             @Override
             public void run() {

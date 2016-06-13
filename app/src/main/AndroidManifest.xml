@@ -36,6 +36,22 @@
             android:process=":sandboxed_process4"
             android:isolatedProcess="false"
             android:exported="false" />
+        <service android:name=".Service5"
+            android:process=":sandboxed_process5"
+            android:isolatedProcess="false"
+            android:exported="false" />
+        <service android:name=".Service6"
+            android:process=":sandboxed_process6"
+            android:isolatedProcess="false"
+            android:exported="false" />
+        <service android:name=".Service7"
+            android:process=":sandboxed_process7"
+            android:isolatedProcess="false"
+            android:exported="false" />
+        <service android:name=".Service8"
+            android:process=":sandboxed_process8"
+            android:isolatedProcess="false"
+            android:exported="false" />
 
 
     </application>
