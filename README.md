@@ -30,6 +30,8 @@ In devtools:
     api.bindService('Service1', ['BIND_AUTO_CREATE', 'BIND_ADJUST_WITH_ACTIVITY'])
     // Remove existing binding:
     ren1.moderateBinding.unbind()
+    // Show OOM buckets via /proc/PID/oom_score_adj
+    api.listOomScores()
 
 In a terminal:
 
@@ -63,6 +65,8 @@ In devtools:
 In a terminal:
 
     # Watch memory usage go up and apps disappear from cached list
+    adb shell dumpsys activity | sed -n -e '/dumpsys activity processes/,$p'
+    # Or use meminfo (but it doesn't show separate background buckets):
     adb shell dumpsys meminfo
     
 In devtools:
