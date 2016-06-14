@@ -85,4 +85,18 @@ public class BaseActivity extends Activity {
     public void killProcess() {
         System.exit(1);
     }
+
+    public void bindService(String className, int bindFlags) {
+        Intent intent = null;
+        try {
+            intent = new Intent(this, Class.forName(className));
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        MyServiceConnection connection = new MyServiceConnection(this);
+        if (!bindService(intent, connection, bindFlags)) {
+            JsApi.log("Bind failed");
+            return;
+        }
+    }
 }

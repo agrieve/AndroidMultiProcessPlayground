@@ -14,10 +14,19 @@ public class BaseService extends Service {
     private final String TAG;
     private IMyAidlInterfaceCallback mCallback;
     private ArrayList<byte[]> mWastedMemory = new ArrayList<>();
+    private ArrayList<MyServiceConnection> mBindings = new ArrayList<>();
 
     public BaseService() {
         super();
         TAG = this.getClass().getSimpleName();
+    }
+
+    void jsLog(String message) {
+        try {
+            mCallback.consoleLog(message);
+        } catch (RemoteException e) {
+            Log.e(TAG, message);
+        }
     }
 
     // Binder object used by clients for this service.
@@ -73,6 +82,28 @@ public class BaseService extends Service {
         @Override
         public int getNice() {
             return JniMethods.getNice();
+        }
+
+        @Override
+        public int bindService(String className, int bindFlags) throws RemoteException {
+            Intent intent = null;
+            try {
+                intent = new Intent(BaseService.this, Class.forName(className));
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+            MyServiceConnection connection = new MyServiceConnection(BaseService.this);
+            if (!BaseService.this.bindService(intent, connection, bindFlags)) {
+                jsLog("Bind failed");
+                return -1;
+            }
+            mBindings.add(connection);
+            return mBindings.size() - 1;
+        }
+
+        @Override
+        public void unbindService(int index) throws RemoteException {
+            BaseService.this.unbindService(mBindings.get(index));
         }
 
         @Override

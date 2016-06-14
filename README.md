@@ -40,6 +40,8 @@ In a terminal:
 
 ### Example Workflow #2 - OOM Order and Task Stacks
 
+In devtools:
+
     // Create a process bound to main activity
     api.createRenderer()
     // Switch to a different activity stack
@@ -51,8 +53,32 @@ In a terminal:
     # Show which OOM bucket each bound service ends up in.
     adb shell dumpsys activity | sed -n -e '/dumpsys activity processes/,$p'
     # Note that both services are always together despite being bound by different activities.
-    
-### Example Workflow #3 - OOM Killing in Action
+
+### Example Workflow #3 - Explicit OOM ordering with `BIND_ABOVE_CLIENT`
+
+In devtools:
+
+    // Create all 8 renderers, and each one create a BIND_ABOVE_CLIENT binding on the previous one.
+    api.createAllRenderers(0, true);  // First 4.
+    api.createAllRenderers(0, true);  // Second 4.
+
+In a terminal:
+
+    # Show which OOM bucket each bound service ends up in.
+    adb shell dumpsys activity | sed -n -e '/dumpsys activity processes/,$p'
+
+In devtools:
+
+    // Remove all "vis" bindings
+    renderers.forEach(function(r) { r.moderateBinding.unbind(); })
+
+In a terminal:
+
+    # Show which OOM bucket each bound service ends up in.
+    adb shell dumpsys activity | sed -n -e '/dumpsys activity processes/,$p'
+    # Switch apps a few times while repeating this step.
+
+### Example Workflow #4 - OOM Killing in Action
 
 In devtools:
 
@@ -68,7 +94,7 @@ In a terminal:
     adb shell dumpsys activity | sed -n -e '/dumpsys activity processes/,$p'
     # Or use meminfo (but it doesn't show separate background buckets):
     adb shell dumpsys meminfo
-    
+
 In devtools:
 
     // This function stops as soon as an onTrimMemory callback is called.
@@ -76,7 +102,7 @@ In devtools:
     api.consumeNativeMemoryUntilLow()
     api.consumeNativeMemoryUntilLow()
 
-### Example Workflow #4 - Thread Priorities
+### Example Workflow #5 - Thread Priorities
 
 In devtools:
 
@@ -91,7 +117,7 @@ In a terminal:
     adb shell top -n 1 | grep multiprocessdemo
     # Monitor CPU usage of top threads
     adb shell top -m 20 -t
-    
+
 In devtools:
 
     // Create workers on another process.
@@ -101,7 +127,7 @@ In devtools:
     ren1.createWorker(10)
     api.listWorkers()
 
-### Example Workflow #5 - BIND_NOT_FOREGROUND
+### Example Workflow #6 - BIND_NOT_FOREGROUND
 
 In devtools:
 
@@ -121,7 +147,7 @@ In a terminal:
     # Monitor CPU usage of top threads
     adb shell top -m 20 -t
 
-### Example Workflow #6 - Changing Thread Priorities
+### Example Workflow #7 - Changing Thread Priorities
 
 In devtools:
 
@@ -130,9 +156,9 @@ In devtools:
     api.createWorker(10)
     // Show performance of each thread
     api.listWorkers()
-    
+
     workerThreads[2].setNice(0)
     api.resetWorkerStats()
     // Show that changed priority worked.
     api.listWorkers()
-    
+

@@ -1,3 +1,4 @@
+var appPackageStr = 'com.example.agrieve.multiprocessdemo';
 var appPackage = com.example.agrieve.multiprocessdemo;
 var Context = android.content.Context;
 var Intent = android.content.Intent;
@@ -9,6 +10,7 @@ var bindRecords = [];
 var workerThreads = [];
 var renderers = [];
 var lastRenderer = 0;
+var window = this;
 
 function setTimeout(func, delay) {
   appPackage.JsApi.uiHandler.postDelayed(func, delay || 0);
@@ -24,42 +26,45 @@ function readFile(f) {
   }
 }
 
-function BindRecord(connection, serviceName, bindFlagsAsStrList) {
-  this.connection = connection;
-  this.contextName = connection.mContext.getClass().getSimpleName();
+function BindRecord(activityOrConnection, serviceName, bindFlagsAsStrList) {
+  this.activityOrConnection = activityOrConnection;
+  this.connection = null;
+  var isLocal = activityOrConnection instanceof appPackage.BaseActivity;
+  this.fromName = isLocal ? activityOrConnection.getClass().getSimpleName() : activityOrConnection.mConnectedComponentName;
   this.serviceName = serviceName;
   this.bindFlagsAsStrList = bindFlagsAsStrList;
   this.pid = null;
 }
 
 BindRecord.prototype.toString = function() {
-  return this.contextName + ' -> ' + this.serviceName + ':' + this.pid + ' (' + this.bindFlagsAsStrList.join('|') + ')'
+  return this.fromName + ' -> ' + this.serviceName + ':' + this.pid + ' (' + this.bindFlagsAsStrList.join('|') + ')'
 };
 
 function Binding(renderer, bindFlagsAsStrList) {
   this.renderer = renderer;
   this.bindFlagsAsStrList = bindFlagsAsStrList;
-  this.isBound = false;
   this.bindRecord = null;
 }
 
 Binding.prototype.bind = function(callback) {
-  if (this.isBound) {
+  if (this.isBound()) {
     console.log('Already Bound.');
     throw Error();
   }
   this.bindRecord = api.bindService(this.renderer.serviceName, this.bindFlagsAsStrList, this.renderer.context, callback);
-  this.isBound = true;
 };
 
 Binding.prototype.unbind = function() {
-  if (!this.isBound) {
+  if (!this.isBound()) {
     console.log('Already Unbound.');
     throw Error();
   }
   api.unbindService(this.bindRecord);
   this.bindRecord = null;
-  this.isBound = false;
+};
+
+Binding.prototype.isBound = function() {
+  return bindRecords.indexOf(this.bindRecord) != -1;
 };
 
 function Renderer(context, serviceName, opt_extraBindFlagsAsStrList) {
@@ -78,52 +83,54 @@ function Renderer(context, serviceName, opt_extraBindFlagsAsStrList) {
   }
 }
 
-Renderer.prototype._checkWaivedBinding = function(megs, opt_chunkSize) {
-  if (!this.waivedBinding.isBound) {
-    console.log('Requires waivedBinding to be bound.');
-    throw Error();
+Renderer.prototype._findConnection = function() {
+  for (var i = 0; i < bindRecords.length; ++i) {
+    if (bindRecords[i].serviceName == this.serviceName) {
+      if (bindRecords[i].connection) {
+        return bindRecords[i].connection;
+      }
+    }
   }
+  console.log('Found no directly connection to ' + this.serviceName);
 };
 
 Renderer.prototype.consumeJavaMemory = function(megs, opt_chunkSize) {
-  this._checkWaivedBinding();
-  api.consumeJavaMemory(megs, opt_chunkSize, this.waivedBinding.bindRecord.connection.mIRemoteService);
+  api.consumeJavaMemory(megs, opt_chunkSize, this._findConnection().mIRemoteService);
 };
 
 Renderer.prototype.consumeNativeMemory = function(megs, opt_chunkSize) {
-  this._checkWaivedBinding();
-  api.consumeNativeMemory(megs, opt_chunkSize, this.waivedBinding.bindRecord.connection.mIRemoteService);
+  api.consumeNativeMemory(megs, opt_chunkSize, this._findConnection()..mIRemoteService);
 };
 
 Renderer.prototype.consumeNativeMemoryUntilLow = function(opt_chunkSize) {
-  this._checkWaivedBinding();
   api.consumeNativeMemoryUntilLow(opt_chunkSize, this);
 };
 
 Renderer.prototype.createWorker = function(opt_threadPriority, opt_posix) {
-  this._checkWaivedBinding();
-  return api.createWorker(opt_threadPriority, opt_posix, this.waivedBinding.bindRecord.connection.mIRemoteService, this.serviceName);
+  return api.createWorker(opt_threadPriority, opt_posix, this._findConnection().mIRemoteService, this.serviceName);
 };
 
 Renderer.prototype.createWorkerNative = function(opt_threadPriority) {
-  this._checkWaivedBinding();
-  return api.createWorkerNative(opt_threadPriority, this.waivedBinding.bindRecord.connection.mIRemoteService, this.serviceName);
+  return api.createWorkerNative(opt_threadPriority, this._findConnection().mIRemoteService, this.serviceName);
 };
 
 Renderer.prototype.setNice = function(value) {
-  this._checkWaivedBinding();
-  this.waivedBinding.bindRecord.connection.mIRemoteService.setNice(value);
+  this._findConnection().mIRemoteService.setNice(value);
 };
 
 Renderer.prototype.getNice = function() {
-  this._checkWaivedBinding();
-  return this.waivedBinding.bindRecord.connection.mIRemoteService.getNice();
+  return this._findConnection().mIRemoteService.getNice();
 };
 
 Renderer.prototype.killProcess = function() {
-  this._checkWaivedBinding();
-  return this.waivedBinding.bindRecord.connection.mIRemoteService.killProcess();
+  return this._findConnection().mIRemoteService.killProcess();
 };
+
+Renderer.prototype.bindService = function(serviceName, bindFlagsAsStrList, opt_callback) {
+  return api.bindService(serviceName, bindFlagsAsStrList, this._findConnection(), opt_callback);;
+};
+
+
 
 
 function WorkerThread(target, threadId, threadPriority) {
@@ -187,12 +194,12 @@ api.finishActivity = function() {
 api.help = function() {
   function desc(objName, obj) {
     for (var k in obj) {
-      if (!(obj[k] instanceof Function)) {
+      if (k[0] != '_' && !(obj[k] instanceof Function)) {
         console.log('  ' + objName + '.' + k + ' = ' + obj[k]);
       }
     }
     for (var k in obj) {
-      if (obj[k] instanceof Function) {
+      if (k[0] != '_' && obj[k] instanceof Function) {
         console.log('  ' + objName + '.' + k + /.*?(\(.*?\))/.exec(obj[k])[1]);
       }
     }
@@ -233,41 +240,38 @@ api.help = function() {
   console.log("  adb shell dumpsys meminfo")
   console.log("  adb shell dumpsys activity | sed -n -e '/dumpsys activity processes/,$p'")
   console.log("  adb shell top -m 20 -t")
-  console.log("  adb shell top -n 1 -t | grep multiprocessdemo")
+  console.log("  adb shell top -n 1 -t | grep example")
   console.log("  adb shell ps -p -t | grep _a" + (Process.myUid() % 10000));
 };
 
-api.bindService = function(serviceName, bindFlagsAsStrList, opt_context, opt_callback) {
+api.bindService = function(serviceName, bindFlagsAsStrList, opt_activityOrConnection, opt_callback) {
   if (callbackApi.connectionCallback) {
     console.log('already a connection callback')
     throw Error();
   }
-  callbackApi.connectionCallback = function() {
-    bindRecord.pid = connection.mIRemoteService.setupConnection(connection.mCallback);
-    console.log('Binding connected: ' + bindRecord);
+  opt_activityOrConnection = opt_activityOrConnection || api.jsApi.activeActivity;
 
-    if (opt_callback) {
-      opt_callback();
-    }
-  };
-
-  var activeActivity = opt_context || api.jsApi.activeActivity;
-
-  var intent = new Intent(activeActivity, appPackage[serviceName]);
   var bindFlags = 0;
   bindFlagsAsStrList.forEach(function(str) {
     bindFlags |= Context[str];
   });
-  var connection = new appPackage.MyServiceConnection(activeActivity);
-  if (!activeActivity.bindService(intent, connection, bindFlags)) {
-    console.log('Bind failed.');
-    throw Error();
+  var isLocal = opt_activityOrConnection instanceof appPackage.BaseActivity;
+  var bindRecord = new BindRecord(opt_activityOrConnection, serviceName, bindFlagsAsStrList);
+  // Never bothered to wire up non-local bind callbacks.
+  if (isLocal) {
+    callbackApi.connectionCallback = function(connection) {
+      bindRecord.connection = connection;
+      if (connection) {
+        bindRecord.pid = connection.mPid;
+      }
+      if (opt_callback) {
+        opt_callback();
+      }
+    };
   }
-  var bindRecord = new BindRecord(connection, serviceName, bindFlagsAsStrList);
+  var bindFrom = isLocal ? opt_activityOrConnection : opt_activityOrConnection.mIRemoteService;
+  bindFrom.bindService(appPackageStr + '.' + serviceName, bindFlags);
   bindRecords.push(bindRecord);
-
-
-
   return bindRecord;
 };
 
@@ -282,7 +286,12 @@ api.unbindService = function(indexOrRecord) {
     throw Error();
   }
   console.log('Removing binding ' + bindRecordIndex + ': ' + bindRecord);
-  bindRecord.connection.mContext.unbindService(bindRecord.connection);
+
+  if (bindRecord.connection) {
+    bindRecord.activityOrConnection.unbindService(bindRecord.connection);
+  } else {
+    bindRecord.activityOrConnection.unbindService(bindRecord.connectionIndex);
+  }
   bindRecords.splice(bindRecordIndex, 1);
 };
 
@@ -296,20 +305,30 @@ api.createRenderer = function(opt_extraBindFlagsAsStrList, opt_serviceName, opt_
     renderer.waivedBinding.bind(opt_callback);
   });
   renderers.push(renderer);
+  window['ren' + renderers.length] = renderer;
   return renderer;
 };
 
-api.createAllRenderers = function(opt_consumeJavaMegs) {
-  ren1 = api.createRenderer(false, null, function() {
-    ren2 = api.createRenderer(false, null, function() {
-      // AFAICT, BIND_NOT_FOREGROUND makes no difference.
-      ren3 = api.createRenderer(['BIND_NOT_FOREGROUND'], null, function() {
-        ren4 = api.createRenderer(['BIND_NOT_FOREGROUND'], null, function() {
+api.createAllRenderers = function(opt_consumeJavaMegs, opt_chainOom) {
+  var prevRenderer = renderers[renderers.length - 1];
+  var r1 = api.createRenderer(false, null, function() {
+    var r2 = api.createRenderer(false, null, function() {
+      // BIND_NOT_FOREGROUND puts processes in a different linux cgroup.
+      var r3 = api.createRenderer(['BIND_NOT_FOREGROUND'], null, function() {
+        var r4 = api.createRenderer(['BIND_NOT_FOREGROUND'], null, function() {
+          if (opt_chainOom) {
+            r4.bindService(r3.serviceName, ['BIND_ABOVE_CLIENT']);
+            r3.bindService(r2.serviceName, ['BIND_ABOVE_CLIENT']);
+            r2.bindService(r1.serviceName, ['BIND_ABOVE_CLIENT']);
+            if (prevRenderer) {
+              r1.bindService(prevRenderer.serviceName, ['BIND_ABOVE_CLIENT']);
+            }
+          }
           if (opt_consumeJavaMegs) {
-            ren1.consumeNativeMemory(opt_consumeJavaMegs, 20);
-            ren2.consumeNativeMemory(opt_consumeJavaMegs, 20);
-            ren3.consumeNativeMemory(opt_consumeJavaMegs, 20);
-            ren4.consumeNativeMemory(opt_consumeJavaMegs, 20);
+            r1.consumeNativeMemory(opt_consumeJavaMegs, 20);
+            r2.consumeNativeMemory(opt_consumeJavaMegs, 20);
+            r3.consumeNativeMemory(opt_consumeJavaMegs, 20);
+            r4.consumeNativeMemory(opt_consumeJavaMegs, 20);
           }
         });
       });
@@ -500,31 +519,22 @@ var callbackApi = {};
 callbackApi.connectionCallback = null;
 callbackApi.lastTrimCallbackLevel = null;
 
-callbackApi.onServiceConnected = function(connection, componentName) {
-  var activityName = connection.mContext.getClass().getSimpleName();
-  console.log('Confirmed ' + activityName + ' binded to ' + componentName.toString());
+callbackApi.onServiceConnected = function(targetName, serviceName, opt_connection) {
+  console.log('Confirmed ' + targetName + ' binded to ' + serviceName);
   if (callbackApi.connectionCallback) {
     var cb = callbackApi.connectionCallback;
     callbackApi.connectionCallback = null;
-    cb();
+    cb(opt_connection);
   }
 };
 
-callbackApi.onServiceDisconnected = function(connection, componentName) {
-  var activityName = connection.mContext.getClass().getSimpleName();
-  console.log('Confirmed ' + activityName + ' unbinded from ' + componentName.toString());
+callbackApi.onServiceDisconnected = function(targetName, serviceName) {
+  console.log('Confirmed ' + targetName + ' unbinded from ' + serviceName);
 };
 
 callbackApi.onActivityDestroyed = function(activity) {
   var activityName = activity.getClass().getSimpleName();
   console.log('Activity Destroyed: ' + activityName);
-  for (var i = 0; i < bindRecords.length;) {
-    if (bindRecords[i].connection.mContext == activity) {
-      api.unbindService(i);
-    } else {
-      ++i;
-    }
-  }
 };
 
 callbackApi.onTrimMemory = function(contextName, level) {

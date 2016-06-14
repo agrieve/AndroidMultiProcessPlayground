@@ -18,4 +18,7 @@ interface IMyAidlInterface {
 
     void setNice(int value);
     int getNice();
+
+   int bindService(String className, int bindFlags);
+   void unbindService(int index);
 }
