@@ -309,13 +309,13 @@ api.createRenderer = function(opt_extraBindFlagsAsStrList, opt_serviceName, opt_
   return renderer;
 };
 
-api.createAllRenderers = function(opt_consumeJavaMegs, opt_chainOom) {
+api.createAllRenderers = function(opt_consumeJavaMegs, opt_chainOom, opt_extraBindFlagsAsStrList) {
   var prevRenderer = renderers[renderers.length - 1];
-  var r1 = api.createRenderer(false, null, function() {
-    var r2 = api.createRenderer(false, null, function() {
+  var r1 = api.createRenderer(opt_extraBindFlagsAsStrList, null, function() {
+    var r2 = api.createRenderer(opt_extraBindFlagsAsStrList, null, function() {
       // BIND_NOT_FOREGROUND puts processes in a different linux cgroup.
-      var r3 = api.createRenderer(['BIND_NOT_FOREGROUND'], null, function() {
-        var r4 = api.createRenderer(['BIND_NOT_FOREGROUND'], null, function() {
+      var r3 = api.createRenderer(opt_extraBindFlagsAsStrList || ['BIND_NOT_FOREGROUND'], null, function() {
+        var r4 = api.createRenderer(opt_extraBindFlagsAsStrList || ['BIND_NOT_FOREGROUND'], null, function() {
           if (opt_chainOom) {
             r4.bindService(r3.serviceName, ['BIND_ABOVE_CLIENT']);
             r3.bindService(r2.serviceName, ['BIND_ABOVE_CLIENT']);
