@@ -25,6 +25,11 @@ public class MyServiceConnection implements ServiceConnection {
         public void consoleLog(String message) {
             JsApi.log(mConnectedComponentName + ": " + message);
         }
+
+        @Override
+        public void onSubServiceConnected(String targetComponentName) throws RemoteException {
+            JsApi.instance.callback("onServiceConnected", mConnectedComponentName, targetComponentName, null);
+        }
     };
 
 
@@ -46,7 +51,7 @@ public class MyServiceConnection implements ServiceConnection {
             }
             JsApi.instance.callback("onServiceConnected", mContext.getClass().getSimpleName(), mConnectedComponentName, this);
         } else if (mContext instanceof BaseService) {
-            ((BaseService)mContext).jsLog("CONNECTED: " +  mContext.getClass().getSimpleName() + " -> " + mConnectedComponentName);
+            ((BaseService)mContext).onSubServiceConnected(mConnectedComponentName);
         }
 
     }

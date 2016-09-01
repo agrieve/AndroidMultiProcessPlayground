@@ -29,6 +29,14 @@ public class BaseService extends Service {
         }
     }
 
+    void onSubServiceConnected(String componentName) {
+        try {
+            mCallback.onSubServiceConnected(componentName);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
+
     // Binder object used by clients for this service.
     private final IMyAidlInterface.Stub mBinder = new IMyAidlInterface.Stub() {
         // NOTE: Implement any IChildProcessService methods here.

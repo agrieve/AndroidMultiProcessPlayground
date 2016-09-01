@@ -162,3 +162,21 @@ In devtools:
     // Show that changed priority worked.
     api.listWorkers()
 
+### Example Workflow #8 - Querying Current Trim Level
+
+In devtools:
+
+    api.createRenderer()
+    api.createRenderer()
+    api.createRenderer()
+    api.printMemoryInfo()  // Look at lastTrimLevel
+
+    ren1.consumeNativeMemoryUntilLow()
+    api.printMemoryInfo()  // lastTrimLevel is now > 0
+
+    ren1.moderateBinding.unbind()
+    ren2.moderateBinding.unbind()
+    ren3.moderateBinding.unbind()
+
+    api.printMemoryInfo()  // lastTrimLevel is now 0 again
+    // Note also that no onTrimMemory log is shown for this transition.

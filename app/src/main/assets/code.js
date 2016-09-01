@@ -1,6 +1,7 @@
 var appPackageStr = 'com.example.agrieve.multiprocessdemo';
 var appPackage = com.example.agrieve.multiprocessdemo;
 var Context = android.content.Context;
+var File = java.io.File;
 var Intent = android.content.Intent;
 var Process = android.os.Process;
 var Thread = java.lang.Thread;
@@ -23,6 +24,25 @@ function readFile(f) {
     return s.hasNext() ? s.next() : "";
   } finally {
     is.close();
+  }
+}
+
+function lsDir(f) {
+  var f = new File(f);
+  return f.list();
+}
+
+function exec(cmd) {
+  var p = Runtime.getRuntime().exec(cmd);
+  var br = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()));
+  var br2 = new java.io.BufferedReader(new java.io.InputStreamReader(p.getErrorStream()));
+  var returnCode = p.waitFor();
+  console.log('ReturnCode=' + returnCode)
+  while (br.ready()) {
+      console.log('' + br.readLine());
+  }
+  while (br2.ready()) {
+      console.log('' + br2.readLine());
   }
 }
 
@@ -99,7 +119,7 @@ Renderer.prototype.consumeJavaMemory = function(megs, opt_chunkSize) {
 };
 
 Renderer.prototype.consumeNativeMemory = function(megs, opt_chunkSize) {
-  api.consumeNativeMemory(megs, opt_chunkSize, this._findConnection()..mIRemoteService);
+  api.consumeNativeMemory(megs, opt_chunkSize, this._findConnection().mIRemoteService);
 };
 
 Renderer.prototype.consumeNativeMemoryUntilLow = function(opt_chunkSize) {
@@ -130,6 +150,9 @@ Renderer.prototype.bindService = function(serviceName, bindFlagsAsStrList, opt_c
   return api.bindService(serviceName, bindFlagsAsStrList, this._findConnection(), opt_callback);;
 };
 
+Renderer.prototype.bindAbove = function(otherRenderer, opt_callback) {
+  return this.bindService(otherRenderer.serviceName, ['BIND_ABOVE_CLIENT'], opt_callback);
+};
 
 
 
@@ -268,6 +291,8 @@ api.bindService = function(serviceName, bindFlagsAsStrList, opt_activityOrConnec
         opt_callback();
       }
     };
+  } else {
+    callbackApi.connectionCallback = opt_callback;
   }
   var bindFrom = isLocal ? opt_activityOrConnection : opt_activityOrConnection.mIRemoteService;
   bindFrom.bindService(appPackageStr + '.' + serviceName, bindFlags);
@@ -290,9 +315,19 @@ api.unbindService = function(indexOrRecord) {
   if (bindRecord.connection) {
     bindRecord.activityOrConnection.unbindService(bindRecord.connection);
   } else {
-    bindRecord.activityOrConnection.unbindService(bindRecord.connectionIndex);
+    bindRecord.activityOrConnection.mIRemoteService.unbindService(bindRecord.connectionIndex);
   }
   bindRecords.splice(bindRecordIndex, 1);
+};
+
+api.createMainProcessService = function(opt_callback) {
+  browser = new Renderer(api.jsApi.activeActivity, 'Service0');
+  browser.strongBinding.bind(function() {
+    browser.pid = browser.strongBinding.bindRecord.pid;
+    browser.waivedBinding.bind(opt_callback);
+  });
+  renderers.unshift(browser);
+  return browser;
 };
 
 api.createRenderer = function(opt_extraBindFlagsAsStrList, opt_serviceName, opt_callback) {
@@ -309,8 +344,23 @@ api.createRenderer = function(opt_extraBindFlagsAsStrList, opt_serviceName, opt_
   return renderer;
 };
 
+api.createRenderer2 = function(mainBindingName, opt_callback) {
+  var serviceName = 'Service' + (++lastRenderer);
+  var renderer = new Renderer(api.jsApi.activeActivity, serviceName);
+  renderer[mainBindingName].bind(function() {
+    renderer.pid = renderer[mainBindingName].bindRecord.pid;
+    if (mainBindingName != 'waivedBinding') {
+      renderer.waivedBinding.bind(opt_callback);
+    } else if (opt_callback) {
+      opt_callback();
+    }
+  });
+  renderers.push(renderer);
+  window['ren' + renderers.length] = renderer;
+  return renderer;
+};
+
 api.createAllRenderers = function(opt_consumeJavaMegs, opt_chainOom, opt_extraBindFlagsAsStrList) {
-  var prevRenderer = renderers[renderers.length - 1];
   var r1 = api.createRenderer(opt_extraBindFlagsAsStrList, null, function() {
     var r2 = api.createRenderer(opt_extraBindFlagsAsStrList, null, function() {
       // BIND_NOT_FOREGROUND puts processes in a different linux cgroup.
@@ -320,9 +370,6 @@ api.createAllRenderers = function(opt_consumeJavaMegs, opt_chainOom, opt_extraBi
             r4.bindService(r3.serviceName, ['BIND_ABOVE_CLIENT']);
             r3.bindService(r2.serviceName, ['BIND_ABOVE_CLIENT']);
             r2.bindService(r1.serviceName, ['BIND_ABOVE_CLIENT']);
-            if (prevRenderer) {
-              r1.bindService(prevRenderer.serviceName, ['BIND_ABOVE_CLIENT']);
-            }
           }
           if (opt_consumeJavaMegs) {
             r1.consumeNativeMemory(opt_consumeJavaMegs, 20);
@@ -548,4 +595,54 @@ callbackApi.onTrimMemory = function(contextName, level) {
   console.log(contextName + '.onTrimMemory(' + level + ')');
 };
 
+macros = {}
+
+macros.approach1 = function() {
+  browser = api.createMainProcessService(function() { // main App
+    gpuProcess = api.createRenderer2('strongBinding', function() { // service1
+      activeTab = api.createRenderer2('strongBinding', function() { // service2
+        doghouse = api.createRenderer2('strongBinding', function() { // service3
+          moderateTab1 = api.createRenderer2('perceptBinding', function() { //service4
+            moderateTab2 = api.createRenderer2('perceptBinding', function() { //service5
+              cchProcess = api.createRenderer2('waivedBinding', function() { //service6
+                cchDoghouseProcess = api.createRenderer2('waivedBinding', function() { //service7
+                  doghouse.bindAbove(activeTab, function() {
+                    cchDoghouseProcess.bindAbove(cchProcess, function() {
+                    });
+                  });
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+};
+
+// This puts gpu process all the way in cch+6. Too aggressive...
+macros.approach1OnPause1 = function() {
+  gpuProcess.bindAbove(moderateTab1, function() {
+    moderateTab1.perceptBinding.unbind();
+    moderateTab2.perceptBinding.unbind();
+    moderateTab1.bindAbove(doghouse, function() {
+      moderateTab2.bindAbove(doghouse, function() {
+      });
+    });
+  });
+};
+
+macros.approach1OnPause2 = function() {
+  gpuProcess.bindAbove(moderateTab1, function() {
+    moderateTab1.perceptBinding.unbind();
+    moderateTab2.perceptBinding.unbind();
+    moderateTab1.bindAbove(activeTab, function() {
+      moderateTab2.bindAbove(activeTab, function() {
+      });
+    });
+  });
+};
+
+
 api.help();
+console.log('Starting trim level = ' + context.startMemInfo.lastTrimLevel);

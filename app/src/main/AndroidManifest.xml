@@ -8,18 +8,23 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".MainActivity">
+        <activity android:name=".MainActivity"
+                  android:configChanges="orientation|keyboardHidden|screenLayout|screenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".SecondActivity">
+        <activity android:name=".SecondActivity"
+                  android:configChanges="orientation|keyboardHidden|screenLayout|screenSize">
         </activity>
         <activity android:name=".AffinityActivity"
-            android:taskAffinity=".affinityAct">
+                  android:taskAffinity=".affinityAct"
+                  android:configChanges="orientation|keyboardHidden|screenLayout|screenSize">
         </activity>
 
+        <service android:name=".Service0"
+                 android:exported="false" /><!-- Browser process -->
         <service android:name=".Service1"
             android:process=":sandboxed_process1"
             android:isolatedProcess="false"
@@ -52,8 +57,6 @@
             android:process=":sandboxed_process8"
             android:isolatedProcess="false"
             android:exported="false" />
-
-
     </application>
 
 </manifest>
